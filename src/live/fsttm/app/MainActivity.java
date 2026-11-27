@@ -50,7 +50,7 @@ public class MainActivity extends Activity implements Speaker, Device {
                     micOn = on;
                     if (on) startMic(); else { listening = false; Mobile.listen(false); }
                 } else if ("radio".equals(name)) {
-                    if (!on) stopRadio();
+                    if (!on) stopRadio("her card");
                     return; // not a saved switch
                 } else if ("voice".equals(name)) {
                     voiceOn = on;
@@ -245,7 +245,7 @@ public class MainActivity extends Activity implements Speaker, Device {
                     return ok("starting");
                 }
                 case "radio.stop":
-                    runOnUiThread(new Runnable() { public void run() { stopRadio(); }});
+                    runOnUiThread(new Runnable() { public void run() { stopRadio("radio.stop (her tool)"); }});
                     return ok("stopped");
                 case "radio.volume":
                     radioVolume = (float) Math.max(0, Math.min(1, a.getDouble("volume")));
@@ -284,28 +284,38 @@ public class MainActivity extends Activity implements Speaker, Device {
     }
 
     void playRadio(String url) {
-        stopRadio();
+        stopRadio("a new station");
         final int gen = ++radioGen;
         radio = new MediaPlayer();
         try {
-            radio.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            radio.setAudioAttributes(new android.media.AudioAttributes.Builder() // music (not the deprecated stream type)
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).build());
             radio.setDataSource(url);
             radio.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 public void onPrepared(MediaPlayer mp) {
                     if (gen != radioGen || mp != radio) { try { mp.release(); } catch (Exception ignored) {} return; } // stopped while buffering
-                    mp.setVolume(radioVolume, radioVolume); mp.start(); }});
+                    mp.setVolume(radioVolume, radioVolume); mp.start(); radioStarted = true; Log.i(TAG, "radio playing"); }});
             radio.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-                public boolean onError(MediaPlayer mp, int what, int extra) { Log.w(TAG, "radio error " + what + "/" + extra); stopRadio(); return true; }});
+                public boolean onError(MediaPlayer mp, int what, int extra) { Log.w(TAG, "radio error " + what + "/" + extra); stopRadio("player error " + what + "/" + extra); return true; }});
             radio.prepareAsync();
         } catch (Exception e) {
             Log.w(TAG, "radio", e);
-            stopRadio();
+            stopRadio("could not open " + e);
         }
     }
 
-    void stopRadio() {
+    boolean radioStarted; // prepared and started: stop() is legal only then (a stop while it loads: error -38 on the Pixel)
+
+    void stopRadio(String why) {
         radioGen++;
-        if (radio != null) { try { radio.stop(); } catch (Exception ignored) {} try { radio.release(); } catch (Exception ignored) {} radio = null; }
+        if (radio != null) {
+            Log.i(TAG, "radio stop: " + why + (radioStarted ? "" : " (while loading)"));
+            if (radioStarted) try { radio.stop(); } catch (Exception ignored) {}
+            try { radio.release(); } catch (Exception ignored) {}
+            radio = null;
+        }
+        radioStarted = false;
     }
 
     /** Her voice over the radio: the radio down while she speaks, up 800 ms after her last word. */
@@ -331,7 +341,7 @@ public class MainActivity extends Activity implements Speaker, Device {
         // running and opens her screen (each new one had started her again, the old WebViews kept)
         listening = false;
         Mobile.listen(false);
-        stopRadio();
+        stopRadio("the Activity ended");
         AudioTrack v = voice; voice = null; if (v != null) v.release();
         if (web != null) { ((android.view.ViewGroup) web.getParent()).removeView(web); web.destroy(); web = null; }
         super.onDestroy();
