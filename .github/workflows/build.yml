@@ -1,0 +1,71 @@
+# Nina Pocket's APKs, both variants: arm32 (Android 7.1+, the Fire 7) and arm64 (Android 8+, newer phones).
+# The code is in four public repos beside this one (build.sh's REPO_ROOT layout); their refs are inputs.
+# Signing: the secret KEYSTORE_B64 (a base64 keystore; KEYSTORE_PASS, KEY_ALIAS) when set, so an update
+# installs over the last one; otherwise a throwaway key for this run (uninstall before installing).
+name: build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      fsttm_ref: {description: fsttm-live ref, default: proof/android}
+      nina_ref: {description: nina-live ref, default: proof/android}
+      acasa_ref: {description: acasa ref, default: fix/old-webview}
+      metis_ref: {description: metis-lang ref, default: master}
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [arm32, arm64]
+    env:
+      FSTTM_REF: ${{ inputs.fsttm_ref || 'proof/android' }}
+      NINA_REF: ${{ inputs.nina_ref || 'proof/android' }}
+      ACASA_REF: ${{ inputs.acasa_ref || 'fix/old-webview' }}
+      METIS_REF: ${{ inputs.metis_ref || 'master' }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {path: nina-pocket, fetch-depth: 0}
+      - name: the code beside it
+        run: |
+          git clone -q --depth 1 -b "$FSTTM_REF" https://github.com/ibnHatab/fsttm-live.git fsttm-live
+          git clone -q --depth 1 -b "$NINA_REF" https://github.com/ibnHatab/nina-live.git nina-live
+          git clone -q --depth 1 -b "$ACASA_REF" https://github.com/ibnHatab/acasa.git acasa
+          git clone -q --depth 1 -b "$METIS_REF" https://github.com/metis-lang-dev/metis-lang.git perotheia-packages/metis-lang
+          for d in fsttm-live nina-live acasa perotheia-packages/metis-lang; do echo "$d $(git -C $d log --oneline -1)"; done
+      - uses: actions/setup-go@v5
+        with: {go-version: '1.26', cache: false}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - name: Android SDK pieces, OCaml (metisc), gomobile
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq ocaml-nox zip
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "build-tools;36.0.0" "platforms;android-36" "ndk;27.0.12077973" > /dev/null
+          go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20261117202452-47699113848a
+          go install golang.org/x/mobile/cmd/gobind@v0.0.0-20261117202452-47699113848a
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+      - name: signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASS_SECRET: ${{ secrets.KEYSTORE_PASS }}
+          KEY_ALIAS_SECRET: ${{ secrets.KEY_ALIAS }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            { echo "KEYSTORE=$RUNNER_TEMP/release.keystore"; echo "KEYSTORE_PASS=$KEYSTORE_PASS_SECRET"; echo "KEY_ALIAS=$KEY_ALIAS_SECRET"; } >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -keystore "$RUNNER_TEMP/throwaway.keystore" -storepass android -keypass android \
+              -alias throwaway -keyalg RSA -keysize 2048 -validity 30 -dname "CN=Nina Pocket CI" > /dev/null
+            { echo "KEYSTORE=$RUNNER_TEMP/throwaway.keystore"; echo "KEYSTORE_PASS=android"; echo "KEY_ALIAS=throwaway"; } >> "$GITHUB_ENV"
+            echo "::warning::no KEYSTORE_B64 secret: signed with a throwaway key (uninstall the app before installing this build)"
+          fi
+      - name: build ${{ matrix.variant }}
+        working-directory: nina-pocket
+        run: ./build.sh ${{ matrix.variant }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nina-pocket-${{ matrix.variant }}
+          path: nina-pocket/out/nina-pocket-${{ matrix.variant }}.apk

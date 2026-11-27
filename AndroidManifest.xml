@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nina Pocket: Nina (nina-live) in fsttm-live's voice app. A WebView on her own screen, the mic fed to
+     Go while she is in front (no wake word), her voice streamed back, the device's own actions (radio,
+     alarms, timers). minSdk and targetSdk come from build.sh's variant (arm32: 25/25, arm64: 26/34).
+     debuggable: her files can be put with run-as during development. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="live.nina.pocket">
+  <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <application android:label="Nina" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"
+      android:allowBackup="false" android:usesCleartextTraffic="true"
+      android:extractNativeLibs="true" android:debuggable="true">
+    <activity android:name="live.fsttm.app.MainActivity" android:exported="true"
+        android:configChanges="orientation|screenSize|keyboardHidden"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>
