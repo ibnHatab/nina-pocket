@@ -37,7 +37,10 @@ echo "== libmetis_rt ($ABI)"
 rt="$METIS_LANG_DIR/runtime"
 "$TC/$CLANG-clang++" -std=c++17 -O2 -fPIC -I"$rt/include" -I"$rt/c" -c "$rt/c/metis_rt.cpp" -o "$cache/metis_rt.o"
 "$TC/llvm-ar" rcs "$cache/libmetis_rt.a" "$cache/metis_rt.o"
-export CGO_CFLAGS="-I$rt/c" CGO_LDFLAGS="-L$cache -lmetis_rt -lc++_static -lc++abi"
+# -lm: libc++ and the runtime use libm (Android 7's libc still exported pow; Android 17's does not: the
+# Pixel 7 refused the library, "cannot locate symbol pow"); 16 KB pages: Android 15+ devices may use
+# them, and warn about (or refuse) a library aligned for 4 KB
+export CGO_CFLAGS="-I$rt/c" CGO_LDFLAGS="-L$cache -lmetis_rt -lc++_static -lc++abi -lm -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384"
 
 echo "== gomobile bind ($GOTARGET, API $API)"
 # gomobile reads go.mod's replaces, not a go.work: for the build only, nina-live's go.mod gets one for
@@ -83,7 +86,7 @@ javac -nowarn -Xlint:-options -source 8 -target 8 -bootclasspath "$JAR" -cp "$ou
 echo "== apk (zip, zipalign, apksigner)"
 cp "$out/base.apk" "$out/unsigned.apk"
 (cd "$out/apk" && zip -q -r "$out/unsigned.apk" classes.dex lib)
-"$BT/zipalign" -f -p 4 "$out/unsigned.apk" "$out/aligned.apk"
+"$BT/zipalign" -f -P 16 4 "$out/unsigned.apk" "$out/aligned.apk"   # -P 16: native libraries on 16 KB pages
 "$BT/apksigner" sign --ks "${KEYSTORE:-$HOME/.android/debug.keystore}" --ks-pass "pass:${KEYSTORE_PASS:-android}" \
   ${KEY_ALIAS:+--ks-key-alias "$KEY_ALIAS"} --out "$here/out/nina-pocket-$variant.apk" "$out/aligned.apk"
 ls -la "$here/out/nina-pocket-$variant.apk"
