@@ -25,8 +25,10 @@ No Android Studio or Gradle: the SDK's build tools, the NDK and gomobile.
 
 The repos beside this one: `fsttm-live`, `nina-live`, `acasa`, `perotheia-packages/metis-lang` (REPO_ROOT).
 CI (`.github/workflows/build.yml`) builds both variants from them; refs are inputs of a manual run.
-For updates that install over the last build, add the secrets `KEYSTORE_B64`, `KEYSTORE_PASS`, `KEY_ALIAS`
-(otherwise each run signs with a throwaway key).
+Signing: `scripts/make-signing-key.sh` (once, by the owner) makes the release key in `~/.config/nina/` and
+sets the CI secrets `KEYSTORE_B64`, `KEYSTORE_PASS`, `KEY_ALIAS`; without them a branch build signs with a
+throwaway key. A release: push a tag `v*` (e.g. `git tag v0.1.0 && git push --tags`): both APKs are built,
+signed with the release key, and attached to a GitHub release.
 ## Measured (Fire 7 2017 "austin", LineageOS 14.1, MT8127, armeabi-v7a, 1 GB; 2026-11-27)
 
 Nina's dialogue running (Gemini Live, pi on Gemini Flash), turns spoken from Pascal's speakers (Paradee):
