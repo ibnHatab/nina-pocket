@@ -71,7 +71,13 @@ public class MainActivity extends Activity implements Speaker, Device {
         micOn = prefs.getBoolean("mic", true);
         voiceOn = prefs.getBoolean("voice", true);
         web.addJavascriptInterface(new NinaApp(), "NinaApp");
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(new WebViewClient() {
+            @Override public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                Log.w(TAG, "the WebView's renderer is gone: a new WebView");
+                runOnUiThread(new Runnable() { public void run() { recreate(); }});
+                return true; // handled: the app lives on
+            }
+        });
         WebView.setWebContentsDebuggingEnabled(true); // chrome://inspect over adb (proof stage)
         web.setWebChromeClient(new WebChromeClient() { // the page's console in logcat (tag fsttm-web)
             @Override public boolean onConsoleMessage(ConsoleMessage m) {
@@ -108,6 +114,7 @@ public class MainActivity extends Activity implements Speaker, Device {
         // straight to her screen once she runs; the start page (her keys, the reason) only when she cannot
         final android.os.Handler h = new android.os.Handler(getMainLooper());
         h.post(new Runnable() { public void run() {
+            if (web == null) return; // this Activity is over
             String s = Mobile.status();
             if ("running".equals(s)) web.loadUrl(Mobile.panel());
             else if (s.startsWith("error") || s.equals("stopped") || s.equals("no persona")) web.loadUrl(start);
@@ -208,16 +215,15 @@ public class MainActivity extends Activity implements Speaker, Device {
 
     /** Speaker: her voice as it streams (s16le mono, 24 kHz); Go paces it in real time. */
     @Override public void voice(byte[] pcm) {
-        if (!voiceOn) return; // her voice switched off on her card: she speaks to no one
+        if (!voiceOn || voice == null) return; // switched off on her card, or this Activity is over
         duck();
-        voice.write(pcm, 0, pcm.length);
+        try { voice.write(pcm, 0, pcm.length); } catch (IllegalStateException released) { /* the Activity ended meanwhile */ }
     }
 
     /** Speaker: she was interrupted: what the track holds is dropped. */
     @Override public void cut() {
-        voice.pause();
-        voice.flush();
-        voice.play();
+        if (voice == null) return;
+        try { voice.pause(); voice.flush(); voice.play(); } catch (IllegalStateException released) { /* the Activity ended meanwhile */ }
     }
 
     // ---- Device: the actions the persona may ask for (a fixed list: no other intent) ----
@@ -321,10 +327,13 @@ public class MainActivity extends Activity implements Speaker, Device {
     static String err(String msg) { return JSONObject.quote(msg).isEmpty() ? "{}" : "{\"status\":\"error\",\"error\":" + JSONObject.quote(msg) + "}"; }
 
     @Override protected void onDestroy() {
+        // the Activity only: Nina (the Go side) runs as long as the process; a new Activity finds her
+        // running and opens her screen (each new one had started her again, the old WebViews kept)
         listening = false;
-        Mobile.stop();
+        Mobile.listen(false);
         stopRadio();
-        voice.release();
+        AudioTrack v = voice; voice = null; if (v != null) v.release();
+        if (web != null) { ((android.view.ViewGroup) web.getParent()).removeView(web); web.destroy(); web = null; }
         super.onDestroy();
     }
 }
