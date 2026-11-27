@@ -41,7 +41,7 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - name: Android SDK pieces, OCaml (metisc), gomobile
         run: |
-          sudo apt-get update -q && sudo apt-get install -yq ocaml-nox zip
+          sudo apt-get update -q && sudo apt-get install -yq ocaml zip   # ocamlopt (ocaml-nox is gone from newer Ubuntu)
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "build-tools;36.0.0" "platforms;android-36" "ndk;27.0.12077973" > /dev/null
           go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20261117202452-47699113848a
           go install golang.org/x/mobile/cmd/gobind@v0.0.0-20261117202452-47699113848a
