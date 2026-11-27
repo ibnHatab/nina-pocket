@@ -41,6 +41,7 @@ public class MainActivity extends Activity implements Speaker, Device {
     /** Her card's mic and voice buttons, in the page as window.NinaApp. */
     public class NinaApp {
         @JavascriptInterface public boolean get(String name) {
+            if ("radio".equals(name)) return radio != null; // playing or buffering: her card shows a stop button
             return "mic".equals(name) ? micOn : "voice".equals(name) && voiceOn;
         }
         @JavascriptInterface public void set(final String name, final boolean on) {
@@ -48,6 +49,9 @@ public class MainActivity extends Activity implements Speaker, Device {
                 if ("mic".equals(name)) {
                     micOn = on;
                     if (on) startMic(); else { listening = false; Mobile.listen(false); }
+                } else if ("radio".equals(name)) {
+                    if (!on) stopRadio();
+                    return; // not a saved switch
                 } else if ("voice".equals(name)) {
                     voiceOn = on;
                     if (!on) cut();
@@ -93,15 +97,22 @@ public class MainActivity extends Activity implements Speaker, Device {
     }
 
     void startGo() {
-        String url;
+        final String start;
         try {
-            url = Mobile.start(getFilesDir().getPath(), java.util.TimeZone.getDefault().getID(), this);
+            start = Mobile.start(getFilesDir().getPath(), java.util.TimeZone.getDefault().getID(), this);
         } catch (Exception e) {
             Log.e(TAG, "start", e);
             web.loadData("<h3>Go side did not start: " + e + "</h3>", "text/html", "utf-8");
             return;
         }
-        web.loadUrl(url);
+        // straight to her screen once she runs; the start page (her keys, the reason) only when she cannot
+        final android.os.Handler h = new android.os.Handler(getMainLooper());
+        h.post(new Runnable() { public void run() {
+            String s = Mobile.status();
+            if ("running".equals(s)) web.loadUrl(Mobile.panel());
+            else if (s.startsWith("error") || s.equals("stopped") || s.equals("no persona")) web.loadUrl(start);
+            else h.postDelayed(this, 300);
+        }});
     }
 
     /** The APK's assets (catalog, nina, nina-ui: her rules, character, config and face) copied into the
@@ -212,6 +223,7 @@ public class MainActivity extends Activity implements Speaker, Device {
     // ---- Device: the actions the persona may ask for (a fixed list: no other intent) ----
 
     MediaPlayer radio;
+    int radioGen; // each play or stop: a stream that becomes ready after a newer one is dropped
     float radioVolume = 0.6f;
     long duckedUntil;
     static final float DUCK = 0.25f; // the radio under her voice
@@ -267,12 +279,15 @@ public class MainActivity extends Activity implements Speaker, Device {
 
     void playRadio(String url) {
         stopRadio();
+        final int gen = ++radioGen;
         radio = new MediaPlayer();
         try {
             radio.setAudioStreamType(AudioManager.STREAM_MUSIC);
             radio.setDataSource(url);
             radio.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                public void onPrepared(MediaPlayer mp) { mp.setVolume(radioVolume, radioVolume); mp.start(); }});
+                public void onPrepared(MediaPlayer mp) {
+                    if (gen != radioGen || mp != radio) { try { mp.release(); } catch (Exception ignored) {} return; } // stopped while buffering
+                    mp.setVolume(radioVolume, radioVolume); mp.start(); }});
             radio.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 public boolean onError(MediaPlayer mp, int what, int extra) { Log.w(TAG, "radio error " + what + "/" + extra); stopRadio(); return true; }});
             radio.prepareAsync();
@@ -283,7 +298,8 @@ public class MainActivity extends Activity implements Speaker, Device {
     }
 
     void stopRadio() {
-        if (radio != null) { try { radio.release(); } catch (Exception ignored) {} radio = null; }
+        radioGen++;
+        if (radio != null) { try { radio.stop(); } catch (Exception ignored) {} try { radio.release(); } catch (Exception ignored) {} radio = null; }
     }
 
     /** Her voice over the radio: the radio down while she speaks, up 800 ms after her last word. */
