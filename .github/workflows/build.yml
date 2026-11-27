@@ -26,7 +26,7 @@ jobs:
       ACASA_REF: ${{ inputs.acasa_ref || 'fix/old-webview' }}
       METIS_REF: ${{ inputs.metis_ref || 'master' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: {path: nina-pocket, fetch-depth: 0}
       - name: the code beside it
         run: |
@@ -35,9 +35,9 @@ jobs:
           git clone -q --depth 1 -b "$ACASA_REF" https://github.com/ibnHatab/acasa.git acasa
           git clone -q --depth 1 -b "$METIS_REF" https://github.com/metis-lang-dev/metis-lang.git perotheia-packages/metis-lang
           for d in fsttm-live nina-live acasa perotheia-packages/metis-lang; do echo "$d $(git -C $d log --oneline -1)"; done
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with: {go-version: '1.26', cache: false}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with: {distribution: temurin, java-version: '17'}
       - name: Android SDK pieces, OCaml (metisc), gomobile
         run: |
@@ -65,7 +65,7 @@ jobs:
       - name: build ${{ matrix.variant }}
         working-directory: nina-pocket
         run: ./build.sh ${{ matrix.variant }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: nina-pocket-${{ matrix.variant }}
           path: nina-pocket/out/nina-pocket-${{ matrix.variant }}.apk
