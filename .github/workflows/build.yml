@@ -36,7 +36,8 @@ jobs:
           git clone -q --depth 1 -b "$ACASA_REF" https://github.com/nina-ai-dev/nina-ha-integration.git acasa
           git clone -q --depth 1 -b "$METIS_REF" https://github.com/metis-lang-dev/metis-lang.git perotheia-packages/metis-lang
           git clone -q --depth 1 -b "${{ inputs.narratives_ref || 'main' }}" https://github.com/nina-ai-dev/nina-narratives.git nina-narratives   # nina-live's catalog/domains links here
-          for d in fsttm-live nina-live acasa perotheia-packages/metis-lang nina-narratives; do echo "$d $(git -C $d log --oneline -1)"; done
+          for p in nina-ha-plugin nina-google-plugin; do git clone -q --depth 1 https://github.com/nina-ai-dev/$p.git $p; done   # nina-narratives devices/<pkg> link into them
+          for d in fsttm-live nina-live acasa perotheia-packages/metis-lang nina-narratives nina-ha-plugin nina-google-plugin; do echo "$d $(git -C $d log --oneline -1)"; done
       - uses: actions/setup-go@v6
         with: {go-version: '1.26', cache: false}
       - uses: actions/setup-java@v5
