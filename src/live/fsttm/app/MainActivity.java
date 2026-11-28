@@ -40,6 +40,15 @@ public class MainActivity extends Activity implements Speaker, Device {
 
     /** Her card's mic and voice buttons, in the page as window.NinaApp. */
     public class NinaApp {
+        // open: a web page in the system browser (Google's sign-in: its redirect comes back to her panel on
+        // 127.0.0.1); only http and https
+        @JavascriptInterface public void open(final String url) {
+            if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) return;
+            runOnUiThread(new Runnable() { public void run() {
+                try { startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
+                catch (Exception e) { Log.w("fsttm", "open: " + e); }
+            }});
+        }
         @JavascriptInterface public boolean get(String name) {
             if ("radio".equals(name)) return radio != null; // playing or buffering: her card shows a stop button
             return "mic".equals(name) ? micOn : "voice".equals(name) && voiceOn;
