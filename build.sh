@@ -57,16 +57,22 @@ mkdir -p "$cache/whisper-stub" && printf 'module github.com/ggerganov/whisper.cp
 (cd "$out" && unzip -q -o bridge.aar classes.jar "jni/$ABI/*" && cp jni/$ABI/*.so "apk/lib/$ABI/")
 
 echo "== her files (assets)"
-img=$(ls -d "$NINA"/catalog/domains/build/home.image.v-* 2>/dev/null | head -1 || true)
-if [ -z "$img" ]; then # the composition's image, built as nina-live's build.sh does (pinned by image.golden)
+# the composition's image pinned by image.golden, built as nina-live's build.sh does (an image left in build/
+# from an older catalog is not it: 2026-11-28, the tablet shipped one without the temperament package); the
+# images it superseded go (Nina refuses to start with two)
+gold="v-$(cat "$NINA/catalog/domains/image.golden")"
+if [ ! -d "$NINA/catalog/domains/build/home.image.$gold" ]; then
   METISC="${METISC:-$METIS_LANG_DIR/src/metisc}"
-  [ -x "$METISC" ] || make -s -C "$METIS_LANG_DIR/src" metisc
+  make -s -C "$METIS_LANG_DIR/src" metisc   # incremental: a stale compiler refuses newer catalogs
   built=$(cd "$NINA/catalog/domains" && "$METISC" build . | grep -o '^image home v-[0-9a-f]*' | grep -o 'v-[0-9a-f]*' | head -1)
-  [ "$built" = "v-$(cat "$NINA/catalog/domains/image.golden")" ] || { echo "image $built is not image.golden's" >&2; exit 1; }
+  [ "$built" = "$gold" ] || { echo "image $built is not image.golden's ($gold)" >&2; exit 1; }
 fi
+for old in "$NINA"/catalog/domains/build/home.image.v-*; do [ "$old" = "$NINA/catalog/domains/build/home.image.$gold" ] || rm -rf "$old"; done
 cp -rL "$NINA/catalog" "$out/assets/catalog"                    # -L: catalog/domains may be a link (the narratives' devices)
 rm -rf "$out/assets/catalog/tests" "$out/assets/catalog/deploy"
+cp "$NINA/mobile/home.map.json" "$out/assets/catalog/world/home.map.json"   # an empty house: no rooms, no devices (app.NoDevice)
 cp "$NINA/mobile/android.yaml" "$out/assets/nina/dialogue.yaml"
+cp "$NINA/mobile/nina.yaml" "$out/assets/nina/nina.yaml"
 cp "$NINA/prompts/nina.md" "$NINA/prompts/voice.md" "$out/assets/nina/"
 cp -rL "$ACASA/ha-ui/www/nina" "$out/assets/nina-ui"
 rm -f "$out/assets/nina-ui"/_test-* "$out/assets/nina-ui/parallax-test.html"
