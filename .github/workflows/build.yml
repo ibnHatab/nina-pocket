@@ -31,11 +31,11 @@ jobs:
         with: {path: nina-pocket, fetch-depth: 0}
       - name: the code beside it
         run: |
-          git clone -q --depth 1 -b "$FSTTM_REF" https://github.com/ibnHatab/fsttm-live.git fsttm-live
-          git clone -q --depth 1 -b "$NINA_REF" https://github.com/ibnHatab/nina-live.git nina-live
-          git clone -q --depth 1 -b "$ACASA_REF" https://github.com/ibnHatab/acasa.git acasa
+          git clone -q --depth 1 -b "$FSTTM_REF" https://github.com/nina-ai-dev/fsttm-live.git fsttm-live
+          git clone -q --depth 1 -b "$NINA_REF" https://github.com/nina-ai-dev/nina-live.git nina-live
+          git clone -q --depth 1 -b "$ACASA_REF" https://github.com/nina-ai-dev/nina-ha-integration.git acasa
           git clone -q --depth 1 -b "$METIS_REF" https://github.com/metis-lang-dev/metis-lang.git perotheia-packages/metis-lang
-          git clone -q --depth 1 -b "${{ inputs.narratives_ref || 'main' }}" https://github.com/ibnHatab/nina-narratives.git nina-narratives   # nina-live's catalog/domains links here
+          git clone -q --depth 1 -b "${{ inputs.narratives_ref || 'main' }}" https://github.com/nina-ai-dev/nina-narratives.git nina-narratives   # nina-live's catalog/domains links here
           for d in fsttm-live nina-live acasa perotheia-packages/metis-lang nina-narratives; do echo "$d $(git -C $d log --oneline -1)"; done
       - uses: actions/setup-go@v6
         with: {go-version: '1.26', cache: false}

@@ -50,10 +50,10 @@ export GOWORK=off GOTOOLCHAIN="${GOTOOLCHAIN_BIND:-go1.26.11}"
 cp "$NINA/go.mod" "$cache/go.mod.keep"; cp "$NINA/go.sum" "$cache/go.sum.keep"
 trap 'cp "$cache/go.mod.keep" "$NINA/go.mod"; cp "$cache/go.sum.keep" "$NINA/go.sum"' EXIT
 mkdir -p "$cache/whisper-stub" && printf 'module github.com/ggerganov/whisper.cpp/bindings/go\n\ngo 1.22\n' > "$cache/whisper-stub/go.mod"
-(cd "$NINA" && go mod edit -replace "github.com/ibnHatab/fsttm-live=$FSTTM" \
+(cd "$NINA" && go mod edit -replace "github.com/nina-ai-dev/fsttm-live=$FSTTM" \
    -replace "github.com/ggerganov/whisper.cpp/bindings/go=$cache/whisper-stub" && go mod tidy > /dev/null 2>&1 || true)
 (cd "$NINA" && PATH="$HOME/go/bin:$PATH" "$gomobile" bind -target=$GOTARGET -androidapi $API -javapkg live.fsttm \
-  -o "$out/bridge.aar" github.com/ibnHatab/fsttm-live/pkg/mobile github.com/ibnHatab/nina-live/mobile)
+  -o "$out/bridge.aar" github.com/nina-ai-dev/fsttm-live/pkg/mobile github.com/nina-ai-dev/nina-live/mobile)
 (cd "$out" && unzip -q -o bridge.aar classes.jar "jni/$ABI/*" && cp jni/$ABI/*.so "apk/lib/$ABI/")
 
 echo "== her files (assets)"

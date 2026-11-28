@@ -145,15 +145,24 @@ public class MainActivity extends Activity implements Speaker, Device {
 
     /** The APK's assets (catalog, nina, nina-ui: her rules, character, config and face) copied into the
      *  app's files when this build's are not there yet; the keys (.config) are never touched. */
+    static final Object ASSETS = new Object(); // one install of her files at a time (two Activities created at once had raced)
     void installAssets() {
+        synchronized (ASSETS) { installAssetsLocked(); }
+    }
+    void installAssetsLocked() {
         try {
             long stamp = getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime;
             SharedPreferences sp = getSharedPreferences("assets", MODE_PRIVATE);
             if (sp.getLong("stamp", 0) == stamp) return;
             for (String top : new String[]{"catalog", "nina", "nina-ui"}) {
-                java.io.File dst = new java.io.File(getFilesDir(), top);
-                deleteTree(dst);
-                copyAsset(top, dst);
+                // copied beside it, then swapped in: the folder is never missing while Nina may read it
+                java.io.File dst = new java.io.File(getFilesDir(), top), tmp = new java.io.File(getFilesDir(), top + ".new"),
+                        old = new java.io.File(getFilesDir(), top + ".old");
+                deleteTree(tmp); deleteTree(old);
+                copyAsset(top, tmp);
+                if (dst.exists() && !dst.renameTo(old)) throw new java.io.IOException("cannot move " + dst + " aside");
+                if (!tmp.renameTo(dst)) throw new java.io.IOException("cannot put " + tmp + " in place");
+                deleteTree(old);
             }
             sp.edit().putLong("stamp", stamp).commit();
             Log.i(TAG, "assets installed");
