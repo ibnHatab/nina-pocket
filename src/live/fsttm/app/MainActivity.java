@@ -35,11 +35,22 @@ public class MainActivity extends Activity implements Speaker, Device {
     volatile boolean listening;
     Thread mic;
     AudioTrack voice; // her speech, streamed
+    android.speech.tts.TextToSpeech tts; boolean ttsReady; // the device's own voice: her setup's narration (no Gemini key yet)
     SharedPreferences prefs; // the person's mic and voice switches (her card's buttons), kept across restarts
     volatile boolean micOn = true, voiceOn = true;
 
     /** Her card's mic and voice buttons, in the page as window.NinaApp. */
     public class NinaApp {
+        // say: a line in the device's own voice (Android's text-to-speech): her guided setup's narration, which a
+        // first setup cannot give her Gemini voice (no key yet); a new line cuts the last. hush: stops it.
+        @JavascriptInterface public boolean say(final String text) {
+            if (!ttsReady || text == null || text.trim().isEmpty()) return false;
+            runOnUiThread(new Runnable() { public void run() {
+                tts.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "nina-setup");
+            }});
+            return true;
+        }
+        @JavascriptInterface public void hush() { if (tts != null) tts.stop(); }
         // open: a web page in the system browser (Google's sign-in: its redirect comes back to her panel on
         // 127.0.0.1); only http and https
         @JavascriptInterface public void open(final String url) {
@@ -72,6 +83,7 @@ public class MainActivity extends Activity implements Speaker, Device {
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
+        startTTS();
         web = new WebView(this);
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
@@ -277,6 +289,13 @@ public class MainActivity extends Activity implements Speaker, Device {
                 }
                 case "alarms.show":
                     return launch(new Intent(AlarmClock.ACTION_SHOW_ALARMS), "shown");
+                case "app.restart": { // her setup wrote what she reads at her start: the app starts again (Restarter, from the front)
+                    final Intent i = new Intent(getApplicationContext(), Restarter.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            .putExtra("pid", android.os.Process.myPid());
+                    Log.i("fsttm", "restarting: through the restarter");
+                    runOnUiThread(new Runnable() { public void run() { startActivity(i); } });
+                    return "{\"status\":\"done\"}";
+                }
                 default:
                     return err("no such action: " + kind);
             }
@@ -345,7 +364,19 @@ public class MainActivity extends Activity implements Speaker, Device {
     static String ok(String status) { return "{\"status\":\"" + status + "\"}"; }
     static String err(String msg) { return JSONObject.quote(msg).isEmpty() ? "{}" : "{\"status\":\"error\",\"error\":" + JSONObject.quote(msg) + "}"; }
 
+    void startTTS() {
+        tts = new android.speech.tts.TextToSpeech(getApplicationContext(), new android.speech.tts.TextToSpeech.OnInitListener() {
+            public void onInit(int status) {
+                if (status != android.speech.tts.TextToSpeech.SUCCESS) { Log.w("fsttm", "tts: not available (" + status + ")"); return; }
+                int r = tts.setLanguage(java.util.Locale.US);
+                ttsReady = r != android.speech.tts.TextToSpeech.LANG_MISSING_DATA && r != android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED;
+                Log.i("fsttm", "tts: " + (ttsReady ? "ready" : "no English voice"));
+            }
+        });
+    }
+
     @Override protected void onDestroy() {
+        if (tts != null) { tts.stop(); tts.shutdown(); tts = null; ttsReady = false; }
         // the Activity only: Nina (the Go side) runs as long as the process; a new Activity finds her
         // running and opens her screen (each new one had started her again, the old WebViews kept)
         listening = false;
