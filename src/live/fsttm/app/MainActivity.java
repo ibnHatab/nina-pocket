@@ -154,7 +154,7 @@ public class MainActivity extends Activity implements Speaker, Device {
             long stamp = getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime;
             SharedPreferences sp = getSharedPreferences("assets", MODE_PRIVATE);
             if (sp.getLong("stamp", 0) == stamp) return;
-            for (String top : new String[]{"catalog", "nina", "nina-ui"}) {
+            for (String top : new String[]{"catalog", "nina", "nina-ui", "plugins"}) {
                 // copied beside it, then swapped in: the folder is never missing while Nina may read it
                 java.io.File dst = new java.io.File(getFilesDir(), top), tmp = new java.io.File(getFilesDir(), top + ".new"),
                         old = new java.io.File(getFilesDir(), top + ".old");

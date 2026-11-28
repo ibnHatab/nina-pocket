@@ -76,6 +76,13 @@ cp "$NINA/mobile/nina.yaml" "$out/assets/nina/nina.yaml"
 cp "$NINA/prompts/nina.md" "$NINA/prompts/voice.md" "$out/assets/nina/"
 cp -rL "$ACASA/ha-ui/www/nina" "$out/assets/nina-ui"
 rm -f "$out/assets/nina-ui"/_test-* "$out/assets/nina-ui/parallax-test.html"
+# her plugins' cards (nina-live docs/design/plugin-cards.md): each plugin's plugin.yaml and web/, in plugins/<repo>/
+# (the phone's nina.yaml lists those it uses); a plugin not checked out beside is left out
+for p in nina-google-plugin nina-ha-plugin; do
+  [ -f "$REPO_ROOT/$p/plugin.yaml" ] || continue
+  mkdir -p "$out/assets/plugins/$p" && cp "$REPO_ROOT/$p/plugin.yaml" "$out/assets/plugins/$p/"
+  [ -d "$REPO_ROOT/$p/web" ] && cp -r "$REPO_ROOT/$p/web" "$out/assets/plugins/$p/"
+done
 
 echo "== resources and manifest (aapt2)"
 VERSION_CODE="${VERSION_CODE:-$(git -C "$here" rev-list --count HEAD 2>/dev/null || echo 1)}"
